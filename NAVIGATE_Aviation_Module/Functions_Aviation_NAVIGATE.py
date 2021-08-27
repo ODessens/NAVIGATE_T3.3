@@ -1,9 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Created on Tue Sep 15 15:41:30 2020
-
-@author: Lynnette Dray
 
 Functions for the NAVIGATE aviation interpolation model
 
@@ -57,7 +54,6 @@ def Read_Grid(run_mode,csv_filename):
     cplength = 5 # number of grid points in carbon price
     
     gridout=np.empty([ylength,clength,nvar,oplength,cplength])   # year, country, variable, op, cp
-#    cindex = 0   # country index - gives positioning of country in arrays
     
     opind = 0
     cpind = 0
@@ -92,40 +88,21 @@ def Read_Price(csv_filename):
     # these should be the same between all sets of model
     # runs and are not expected to change
     ylength = 2100 - 2005 + 1   # i.e. all years from 2005 to 2100
-    clength = 1 # the number of countries in the TIAM output
-    nvar = 2     # the number of variables we are outputting
-#    if run_mode == 0:  # basic mode, i.e. fuel only
-#        nvar = 2     #(Kerosene and CO2 price - NB: CO2 price calculated from ratio of FF kerosene)
-#    oplength = 9 # number of grid points in oil price
-#    cplength = 5 # number of grid points in carbon price
-    
-    priceout=np.empty([ylength,nvar])   # year, variable
-#    cindex = 0   # country index - gives positioning of country in arrays
-    
-#    opind = 0
-#    cpind = 0
-    for i in range(1,(len(pricedatain))):  # 0 is headers
-#        # work out which point in thdde oil and carbon price grid we are
-#        if (cpind == cplength):
-#            cpind = 0
-#            opind += 1
-#        if (opind == oplength):
-#            cpind = 0
-#            opind = 0
+    clength = 16 # the number of countries in the TIAM output
+    nvar = 2     # the number of variables we are outputting: kerosene and carbon prices.
 
-        # current data arrangement:     
-        # i is the row of data, i.e. one data point per variable
-        # j[0] is year, j[1] is country code which we'll need
-        # to represent with the index j[2], 3 and 4 give the specific 
-        # oil and carbon price variables used, then output variables
-        # start at 5
+    priceout=np.empty([ylength,clength,nvar])   # year, reg, variable
+
+
+    for i in range(1,(len(pricedatain))):  # 0 is headers
+
         ygrid = int(pricedatain[i][0]) - 2005   # data starts at 2005
-#        cgrid = int(griddatain[i][1])
+        cgrid = int(pricedatain[i][2])
             
         for j in range(0,nvar):
-#            gridout[ygrid][cgrid][j] = griddatain[i][2+j]
-            priceout[ygrid][j] = pricedatain[i][1+j]
-#        cpind += 1
+            
+            priceout[ygrid][cgrid][j] = pricedatain[i][3+j]
+
     return priceout;
 
 def Read_Country_Lookup(csv_filename):
@@ -137,9 +114,8 @@ def Read_Country_Lookup(csv_filename):
     lookupout = []
 
     for i in range(1,(len(datain))):  # 0 is headers
-        # datain[i][2] is the NAVIGATE 3-letter region code
+        # datain[i][2] is the NAVIGATE TIAM-UCL 3-letter region code
         # datain[i][1] is the array position we want to put it in 
-        # datain[i][3] is fuel scaling lookup (ignored here)
         # this means the output is a list of strings giving the 
         # NAVIGATE region per country, where the array index gives
         # the country
@@ -150,9 +126,8 @@ def Read_Country_Lookup(csv_filename):
 
 def Get_Op_GridPoints(year):
     
-    # The input model runs have oil and carbon price that 
-    # changes by year (the modelled range becomes greater 
-    # over time). Get_Op_GridPoints and Get_Cp_GridPoints
+    # The input model runs have kerosene and carbon price that 
+    # changes by year. Get_Op_GridPoints and Get_Cp_GridPoints
     # account for this in the interpolation grid values.
     # Note that the main interpolation routine is called 
     # with kerosene price per kg in year 2005 USD - this
@@ -179,9 +154,8 @@ def Get_Op_GridPoints(year):
 
 def Get_Cp_GridPoints(year):
     
-    # The input model runs have oil and carbon price that 
-    # changes by year (the modelled range becomes greater 
-    # over time). Get_Op_GridPoints and Get_Cp_GridPoints
+    # The input model runs have kerosene and carbon price that 
+    # changes by year. Get_Op_GridPoints and Get_Cp_GridPoints
     # account for this in the interpolation grid values
 
     # Baseline carbon price grid. These apply from 2050 onwards 
@@ -332,54 +306,7 @@ def Interpolate_Outcomes(year,reg_interp,kp_interp,cp5_interp,base_grid,country_
                 vars_out[n] = 0.0
                      
     return vars_out;
-
-
-def Generate_Test_Keroseneprice(year, rate):
-    
-    # generates a kerosene price trend for model testing, based
-    # on a yearly growth rate after 2017
-
-    # values to return for the 2005-2016 period, year 2015 dollars, US EIA data
-    # these are per US gallon - convert to per kg
-    kp0516 = [2.11,2.35,2.47,3.36,1.88,2.39,3.22,3.20,3.03,2.77,1.63,1.30,1.56]
-   
-    # per kg at typical density
-    jeta1kgpergallon = 3.044
-    
-    # conversion to year 2005 dollars
-    inflateFactor = 0.824
-    
-    if (year < 2017):
-        kp_out = inflateFactor * kp0516[max(year-2005,0)]/jeta1kgpergallon
-    else:
-        kp_out = inflateFactor * kp0516[len(kp0516)-1] * ( rate ** ( year - 2017 ) ) / jeta1kgpergallon
-    
-    # this gets us year 2005 dollars per kg kerosene, which is what the 
-    # model expects as input
-  
-    return kp_out;
- 
-def Generate_Test_Carbonprice(year, baseval, rate):
-    
-    # generates a carbon price trend for model testing, based
-    # on a yearly growth rate after 2019 and assuming 0 before
-    # then (i.e. ignoring the EU ETS). Note that this is the 
-    # effective carbon price applied across all carbon on a 
-    # given route group, i.e. no baseline is assumed. 
- 
-    
-    if (year < 2020):
-        cp_out = 0
-    else:
-        cp_out = baseval * ( rate ** ( year - 2020 ) )
-    
-    # for output, assume price per kgCO2
-    # note this is year 2005 dollars
-    # (input price is per tCO2)
-    
-    cp_out = cp_out / 1000.0;     
-    
-    return cp_out;
+#
 
 def CpricePerKGJetA(carbonprice):
     
@@ -390,3 +317,4 @@ def CpricePerKGJetA(carbonprice):
     cpriceperkg = 3.15 * carbonprice 
     
     return cpriceperkg;
+#

@@ -37,7 +37,7 @@ called with a given kerosene and carbon price.
 It can be used to model biofuels as follows:
     1. uptake of biofuel is assumed either via a biofuel mandate or from biofuel
     being less expensive that fossil jet A once carbon price is factored in. This
-    calculation is assumed done outside the model.
+    calculation is assumed done outside the metamodel in each NAVIGATE T3.3 IAM.
     2. given the calculated uptake/blend, the model input carbon price and kerosene
     price are adjusted. For example, if the blend is 20% biofuel and biofuel
     is exempt from carbon pricing, the carbon price to the model is reduced by
@@ -67,8 +67,8 @@ import Functions_Aviation_NAVIGATE as func
 
 # Input parameters which are the same throughout one whole
 # run. These are used to select which data is read in.
-soc_scen = "SSP3"
-tech_scen = "t1"
+soc_scen = "SSP2"
+tech_scen = "t2"
 # two potential run modes at present:
 # basic (run_mode=0) - only reads in and outputs aviation fuel use
 # full (run_mode=1) - reads in and outputs a range of metrics, including flights, RPK, RTK, NOx, distance flown etc.
@@ -85,20 +85,19 @@ print("Loading grid data...")
 
 # Data to interpolate between - this is slow so ideally do only once
 # base grid is the main grid of interpolation data by country
-# country_lookup gives the relationship between country and NAVIGATE region
+# country_lookup gives the relationship between country and NAVIGATE IAMs'region
 start_time=time.time()
 
 base_grid = func.Read_Grid(run_mode,data_folder + "grid_output_by_country_" + soc_scen + "_" + tech_scen + ".csv")
 country_lookup = func.Read_Country_Lookup(data_folder + "country_region_lookup.csv")
-price_IAM = func.Read_Price(data_folder + "Prices_KerCO2_TIAM-UCL.csv")
+price_IAM = func.Read_Price(data_folder + "Prices_KerCO2.csv")
 
 end_time=time.time()
 load_time=end_time-start_time
 print("Read-in time:")
 print(load_time)
 
-# A test routine to show the model in use. This loops over the TIAM 
-# regions and all years 2020-2100, working out total fuel use. 
+# A routine loops over the TIAM-UCL 16 regions and all years 2020-2100, working out total fuel use. 
 
 start_time=time.time()
 
@@ -117,20 +116,17 @@ data_out = np.zeros([yend-ystart+1,len(regs),len(base_grid[0][0])+4])
 
 
 for year in range(ystart,yend+1):
-
-    kp_interp = price_IAM[year-ystart,0]   # generates a test kerosene price which increases at 2%/year after 2016. This is in year 2005 USD/kg 
-    cp_interp = price_IAM[year-ystart,1]  # generates a test carbon price starting from $20/tCO2 in 2020 and increasing at 3%/year
-    # note both kp_interp and cp_interp are in units year 2005 USD/kg for 
-    # consistency with likely input values from TIAM
-       
     for r in range(0,len(regs)):
+        kp_interp = price_IAM[year-ystart,r,0]   # kerosene price in year-2005-USD/kg 
+        cp_interp = price_IAM[year-ystart,r,1]  # carbon price in year-2005-USD/kgCO2 in 2020 and increasing at 3%/year
+    # note both kp_interp and cp_interp are in units year 2005 USD/kg for consistency with likely input values from TIAM for r in range(0,len(regs)):
     
-        # store year, kerosene and carbon prices in test output
+        # store year, kerosene and carbon prices in variable output
         data_out[year-ystart,r,0] = year
         data_out[year-ystart,r,1] = kp_interp
         data_out[year-ystart,r,2] = cp_interp
 
-        # for test output, also store what the effective kerosene price is including 
+        # for variable output, also store what the effective kerosene price is including 
         # carbon costs (not used as input to the interpolation model itself as this takes
         # carbon and fuel price separately)     
         data_out[year-ystart,r,3] = data_out[year-ystart,r,1] + func.CpricePerKGJetA(cp_interp)
